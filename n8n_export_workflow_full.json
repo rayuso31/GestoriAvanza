@@ -19,7 +19,7 @@
         },
         {
             "parameters": {
-                "jsCode": "const invoices = $input.all()[0].json.invoices || [];\n\n// Preparamos los datos tanto para Excel como para GSheets\nreturn invoices.map(inv => ({\n  json: {\n    ...inv.data,\n    filename: inv.filename,\n    exported_at: new Date().toISOString()\n  }\n}));"
+                "jsCode": "const invoices = $input.all()[0].json.invoices || [];\n\n// Preparamos los datos fusionando la info extraída con los metadatos globales\nreturn invoices.map(inv => ({\n  json: {\n    ...inv.data,\n    ...inv.metadata, // Aquí vienen providerCode, docType, deductibility\n    filename: inv.filename,\n    exported_at: new Date().toISOString()\n  }\n}));"
             },
             "name": "Preparar Datos",
             "type": "n8n-nodes-base.code",
@@ -53,7 +53,7 @@
         },
         {
             "parameters": {
-                "jsCode": "// Mapeo FINAL para Excel Contasol\n// Aseguramos que las claves coincidan con las columnas esperadas\nreturn $input.all().map(item => {\n   const d = item.json;\n   return {\n     json: {\n        'A': 'F',                  // Tipo por defecto\n        'B': '00000',              // Codigo proveedor (ajustar si viene en data)\n        'C': '',                   // Actividad\n        'E': d.fecha,              // Fecha\n        'L': d.numero_factura,     // Factura\n        'S': d.base_imponible,     // Base\n        'T': d.cuota_iva,          // IVA\n        'U': d.total,              // Total\n        'Z': d.proveedor           // Info extra\n     }\n   }\n});"
+                "jsCode": "// Mapeo FINAL para Excel Contasol\nreturn $input.all().map(item => {\n   const d = item.json;\n   \n   // Lógica de Deducibilidad (0=Si, 1=No)\n   const tipoDeduccion = d.deductibility === 'No Deducible' ? 1 : 0;\n   \n   // Lógica de Tipo Documento (F=Factura, R=Rectificativa)\n   const tipoDoc = d.docType === 'Factura Rectificativa' ? 'R' : 'F';\n\n   return {\n     json: {\n        'A': tipoDoc,              // F o R\n        'B': d.providerCode,       // Código 400xxx introducido por usuario\n        'C': '',                   // Actividad\n        'E': d.fecha,              // Fecha\n        'G': d.providerCode,       // ID Proveedor (Columna G solicitada)\n        'L': d.numero_factura,     // Factura\n        'S': d.base_imponible,     // Base\n        'T': d.cuota_iva,          // IVA\n        'U': d.total,              // Total\n        'Z': d.proveedor,          // Info extra\n        'BH': tipoDeduccion        // 0 o 1 (Columna BH solicitada)\n     }\n   }\n});"
             },
             "name": "Formato Contasol",
             "type": "n8n-nodes-base.code",

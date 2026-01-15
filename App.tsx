@@ -8,11 +8,9 @@ const App: React.FC = () => {
     <div className="min-h-screen flex flex-col text-slate-900">
       <Header />
 
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex flex-col items-center gap-10">
-        <div className="w-full max-w-xl space-y-8">
-          <BatchUpload />
-          <RecentUploads />
-        </div>
+      <main className="flex-1 w-full px-6 py-6">
+        {/* Full-width layout for desktop */}
+        <BatchUpload />
       </main>
 
       <footer className="py-6 text-center text-slate-400 text-sm">

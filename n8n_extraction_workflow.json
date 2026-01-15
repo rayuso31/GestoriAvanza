@@ -6,16 +6,39 @@
                 "httpMethod": "POST",
                 "path": "extract",
                 "responseMode": "responseNode",
-                "options": {}
+                "options": {
+                    "binaryData": true
+                }
             },
             "name": "Webhook",
             "type": "n8n-nodes-base.webhook",
             "typeVersion": 1,
             "position": [
-                460,
+                380,
                 340
             ],
             "id": "webhook-trigger"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{ $binary.file.mimeType }}",
+                            "operation": "contains",
+                            "value2": "pdf"
+                        }
+                    ]
+                }
+            },
+            "name": "Es PDF?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                600,
+                340
+            ],
+            "id": "is-pdf-check"
         },
         {
             "parameters": {
@@ -23,27 +46,45 @@
                 "options": {
                     "temperature": 0.1
                 },
-                "prompt": "Analiza esta factura adjunta y extrae la siguiente información en formato JSON estricto:\n- fecha (DD/MM/YYYY)\n- numero_factura (string)\n- base_imponible (número, usa punto para decimales)\n- cuota_iva (número)\n- total (número)\n- proveedor (nombre)\n- cif_proveedor (si aparece)\n\nSi no encuentras algún campo, devuelve null."
+                "prompt": "Analiza este DOCUMENTO PDF adjunto y extrae información en JSON estricto:\n- fecha\n- numero_factura\n- base_imponible\n- cuota_iva\n- total\n- proveedor\n- cif_proveedor"
             },
-            "name": "Mistral AI",
+            "name": "Mistral PDF",
             "type": "n8n-nodes-base.mistralAi",
             "typeVersion": 1,
             "position": [
-                680,
-                340
+                820,
+                240
             ],
-            "id": "mistral-node",
-            "notes": "Configura tus credenciales de Mistral aquí"
+            "id": "mistral-pdf",
+            "notes": "Configura aquí modo DOCUMENTO"
         },
         {
             "parameters": {
-                "jsCode": "// Parsea el contenido de Mistral y asegúrate que es un objeto limpio\nconst mistralContent = $input.all()[0].json.content || '{}';\nlet extractedData = {};\ntry {\n  extractedData = JSON.parse(mistralContent);\n} catch (e) {\n  extractedData = { error: 'Error parseando JSON de IA', raw: mistralContent };\n}\n\n// Añadimos metadatos del input original si los hay\nconst body = $input.all()[0].json.body || {};\n\nreturn [{\n  json: {\n    ...extractedData,\n    _metadata: {\n       providerCode: body.providerCode,\n       docType: body.docType,\n       filename: body.filename // Si lo enviamos desde frontend\n    }\n  }\n}];"
+                "model": "mistral-large-latest",
+                "options": {
+                    "temperature": 0.1
+                },
+                "prompt": "Analiza esta IMAGEN adjunta y extrae información en JSON estricto:\n- fecha\n- numero_factura\n- base_imponible\n- cuota_iva\n- total\n- proveedor\n- cif_proveedor"
+            },
+            "name": "Mistral Vision",
+            "type": "n8n-nodes-base.mistralAi",
+            "typeVersion": 1,
+            "position": [
+                820,
+                440
+            ],
+            "id": "mistral-vision",
+            "notes": "Configura aquí modo VISIÓN"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Unificamos respuesta de ambas ramas\nconst mistralContent = $input.all()[0].json.content || '{}';\nlet extractedData = {};\ntry {\n  extractedData = JSON.parse(mistralContent);\n} catch (e) {\n  extractedData = { error: 'Error parseando JSON de IA', raw: mistralContent };\n}\n\n// Recuperamos metadatos originales del body (OJO: al pasar por nodos AI a veces se pierde el body original, asegurarse de pasarlo o recuperarlo del webhook)\n// Simplificación para demo: asumimos que la data está en el item\nreturn [{\n  json: {\n    ...extractedData\n  }\n}];"
             },
             "name": "Limpiar JSON",
             "type": "n8n-nodes-base.code",
             "typeVersion": 1,
             "position": [
-                900,
+                1040,
                 340
             ],
             "id": "clean-json-node"
@@ -59,7 +100,7 @@
             "type": "n8n-nodes-base.respondToWebhook",
             "typeVersion": 1,
             "position": [
-                1120,
+                1260,
                 340
             ],
             "id": "response-node"
@@ -70,14 +111,43 @@
             "main": [
                 [
                     {
-                        "node": "Mistral AI",
+                        "node": "Es PDF?",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "Mistral AI": {
+        "Es PDF?": {
+            "main": [
+                [
+                    {
+                        "node": "Mistral PDF",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Mistral Vision",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Mistral PDF": {
+            "main": [
+                [
+                    {
+                        "node": "Limpiar JSON",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Mistral Vision": {
             "main": [
                 [
                     {

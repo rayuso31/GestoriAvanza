@@ -39,14 +39,15 @@ export const BatchUpload: React.FC = () => {
     // --- Logic ---
     const handleFiles = (newFiles: FileList | null) => {
         if (!newFiles) return;
-        const validFiles = Array.from(newFiles).filter(f => f.type === 'application/pdf');
-        if (validFiles.length < newFiles.length) alert('Solo se admiten archivos PDF.');
+        const validFiles = Array.from(newFiles).filter(f => f.type === 'application/pdf' || f.type.startsWith('image/'));
+        if (validFiles.length < newFiles.length) alert('Solo se admiten facturas en PDF o Imagen (JPG/PNG).');
         if (validFiles.length === 0) return;
 
         const newInvoices: InvoiceRequest[] = validFiles.map(file => ({
             id: Math.random().toString(36).substr(2, 9),
             file,
-            status: 'pending'
+            status: 'pending',
+            data: { fecha: null, numero_factura: null, base_imponible: null, cuota_iva: null, total: null, proveedor: null, cif_proveedor: null }
         }));
 
         setInvoices(prev => [...prev, ...newInvoices]);
@@ -174,7 +175,7 @@ export const BatchUpload: React.FC = () => {
                                 ref={fileInputRef}
                                 className="hidden"
                                 multiple // Allow multiple!
-                                accept="application/pdf"
+                                accept="application/pdf, image/jpeg, image/png, image/webp"
                                 onChange={(e) => handleFiles(e.target.files)}
                             />
                             <div className="flex flex-col items-center gap-3">
@@ -184,7 +185,7 @@ export const BatchUpload: React.FC = () => {
                                 <p className="text-sm font-medium text-slate-900">
                                     Arrastra tu PDF aquí o <span className="text-[#9e1c22] underline decoration-red-200 underline-offset-2 hover:decoration-[#9e1c22]">haz clic para buscar</span>
                                 </p>
-                                <p className="text-xs text-slate-500">Soporta archivos PDF hasta 10MB</p>
+                                <p className="text-xs text-slate-500">Soporta PDF, JPG y PNG hasta 10MB</p>
                             </div>
                         </div>
 
@@ -267,27 +268,92 @@ export const BatchUpload: React.FC = () => {
     // STATE 2: PROCESSING / REVIEW (WIDE VIEW)
     return (
         <div className="w-full bg-slate-50 rounded-xl border border-slate-200 shadow-sm flex flex-col h-[800px] animate-in fade-in duration-300">
-            {/* Header */}
-            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-white rounded-t-xl">
-                <div className="flex items-center gap-3">
-                    <h2 className="font-semibold text-slate-700">Procesando Lote</h2>
-                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md border border-slate-200 font-mono">
-                        PROV: {providerCode || '---'}
-                    </span>
+            {/* Header: Global Controls & Actions */}
+            <div className="p-4 border-b border-slate-200 bg-white rounded-t-xl flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                        <h2 className="font-semibold text-slate-700">Gestión de Lote</h2>
+                        {/* Progress Badge */}
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border flex items-center gap-1.5 ${invoices.every(i => i.status === 'success')
+                            ? 'bg-green-100 text-green-700 border-green-200'
+                            : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            }`}>
+                            {invoices.some(i => i.status === 'processing') ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                            {invoices.filter(i => i.status === 'success').length}/{invoices.length}
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => {
+                                if (confirm('¿Borrar todas las facturas y empezar de nuevo?')) {
+                                    setInvoices([]);
+                                    setSelectedInvoiceId(null);
+                                    setProviderCode(''); // Reset provider too if desired, or keep it. Let's keep it for now as user might do multiple batches for same provider. actually reseting it might be safer to avoid mixing. Let's reset it.
+                                    setProviderCode('');
+                                }
+                            }}
+                            className="bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 px-3 py-2 rounded-lg text-sm font-medium flex gap-2 items-center transition-colors shadow-sm"
+                            title="Empezar de nuevo"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                        <button
+                            onClick={() => setShowPdf(!showPdf)}
+                            className={`p-2 rounded-lg border transition-colors ${showPdf ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                            title={showPdf ? "Ocultar Vista Previa" : "Mostrar Vista Previa"}
+                        >
+                            {showPdf ? <Eye size={18} /> : <EyeOff size={18} />}
+                        </button>
+                        <button onClick={handleExport} className="bg-[#9e1c22] hover:bg-[#85161b] text-white px-4 py-2 rounded-lg text-sm font-medium flex gap-2 items-center transition-colors shadow-sm">
+                            <Download size={16} /> Exportar Excel
+                        </button>
+                    </div>
                 </div>
 
-                <div className="flex gap-2">
-                    {/* Progress Badge */}
-                    <span className={`px-3 py-1.5 rounded-full text-xs font-medium border flex items-center gap-2 ${invoices.every(i => i.status === 'success')
-                            ? 'bg-green-100 text-green-700 border-green-200'
-                            : 'bg-indigo-50 text-indigo-700 border-indigo-200 animate-pulse'
-                        }`}>
-                        {invoices.some(i => i.status === 'processing') ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                        {invoices.filter(i => i.status === 'success').length} / {invoices.length}
-                    </span>
-                    <button onClick={handleExport} className="bg-[#9e1c22] hover:bg-[#85161b] text-white px-4 py-1.5 rounded-lg text-sm font-medium flex gap-2 items-center transition-colors">
-                        <Download size={16} /> Exportar Excel
-                    </button>
+                {/* Global Settings Row (Editable) */}
+                <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm">
+                    <div className="flex flex-col gap-1 w-32">
+                        <label className="text-xs text-slate-500 font-medium">Proveedor *</label>
+                        <input
+                            type="number"
+                            value={providerCode}
+                            onChange={(e) => setProviderCode(e.target.value)}
+                            className="h-8 px-2 rounded border border-slate-300 text-slate-800 text-xs focus:ring-1 focus:ring-[#9e1c22]"
+                            placeholder="Cod. Contasol"
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1 w-40">
+                        <label className="text-xs text-slate-500 font-medium">Tipo Documento</label>
+                        <select
+                            value={docType}
+                            onChange={(e) => setDocType(e.target.value as DocumentType)}
+                            className="h-8 px-2 rounded border border-slate-300 text-slate-800 text-xs focus:ring-1 focus:ring-[#9e1c22]"
+                        >
+                            <option value={DocumentType.ORDINARY}>{DocumentType.ORDINARY}</option>
+                            <option value={DocumentType.TICKET}>{DocumentType.TICKET}</option>
+                            <option value={DocumentType.RECTIFICATION}>{DocumentType.RECTIFICATION}</option>
+                        </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1 flex-1">
+                        <label className="text-xs text-slate-500 font-medium">Deducibilidad</label>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setDeductibility(Deductibility.FULL)}
+                                className={`px-3 py-1 rounded border text-xs transition-colors ${deductibility === Deductibility.FULL ? 'bg-green-100 border-green-300 text-green-700' : 'bg-white border-slate-200 text-slate-600'}`}
+                            >
+                                100%
+                            </button>
+                            <button
+                                onClick={() => setDeductibility(Deductibility.NONE)}
+                                className={`px-3 py-1 rounded border text-xs transition-colors ${deductibility === Deductibility.NONE ? 'bg-red-50 border-red-200 text-red-700' : 'bg-white border-slate-200 text-slate-600'}`}
+                            >
+                                No Deducible
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -313,13 +379,38 @@ export const BatchUpload: React.FC = () => {
                                         className={`cursor-pointer hover:bg-slate-50 ${selectedInvoiceId === inv.id ? 'bg-indigo-50' : ''}`}
                                     >
                                         <td className="px-3 py-3">
-                                            {inv.status === 'processing' ? <RefreshCw className="animate-spin text-indigo-500" size={16} /> :
+                                            {inv.status === 'processing' ? <Loader2 className="animate-spin text-indigo-500" size={16} /> :
                                                 inv.status === 'success' ? <CheckCircle2 className="text-emerald-500" size={16} /> :
-                                                    inv.status === 'error' ? <AlertCircle className="text-red-500" size={16} /> : <div className="w-4 h-4 bg-slate-200 rounded-full" />}
+                                                    inv.status === 'error' ? <AlertCircle className="text-red-500" size={16} title={inv.error} /> : <div className="w-4 h-4 bg-slate-200 rounded-full" />}
                                         </td>
-                                        <td className="px-3 py-3">{inv.status === 'success' ? <input value={inv.data?.fecha || ''} onChange={e => updateField(inv.id, 'fecha', e.target.value)} className="bg-transparent w-full outline-none" /> : <span className="text-slate-400">...</span>}</td>
-                                        <td className="px-3 py-3">{inv.status === 'success' ? <input value={inv.data?.proveedor || ''} onChange={e => updateField(inv.id, 'proveedor', e.target.value)} className="bg-transparent w-full outline-none" /> : <span className="text-slate-400">...</span>}</td>
-                                        <td className="px-3 py-3 text-right">{inv.status === 'success' ? <input type="number" value={inv.data?.total || ''} onChange={e => updateField(inv.id, 'total', parseFloat(e.target.value))} className="bg-transparent w-full outline-none text-right" /> : <span className="text-slate-400">...</span>}</td>
+                                        <td className="px-3 py-3">
+                                            <input
+                                                value={inv.data?.fecha || ''}
+                                                onChange={e => updateField(inv.id, 'fecha', e.target.value)}
+                                                disabled={inv.status === 'processing'}
+                                                placeholder="dd/mm/yyyy"
+                                                className="bg-transparent w-full outline-none disabled:opacity-50 placeholder:text-slate-300"
+                                            />
+                                        </td>
+                                        <td className="px-3 py-3">
+                                            <input
+                                                value={inv.data?.proveedor || ''}
+                                                onChange={e => updateField(inv.id, 'proveedor', e.target.value)}
+                                                disabled={inv.status === 'processing'}
+                                                placeholder="Nombre Proveedor"
+                                                className="bg-transparent w-full outline-none disabled:opacity-50 placeholder:text-slate-300"
+                                            />
+                                        </td>
+                                        <td className="px-3 py-3 text-right">
+                                            <input
+                                                type="number"
+                                                value={inv.data?.total || ''}
+                                                onChange={e => updateField(inv.id, 'total', parseFloat(e.target.value))}
+                                                disabled={inv.status === 'processing'}
+                                                placeholder="0.00"
+                                                className="bg-transparent w-full outline-none text-right disabled:opacity-50 placeholder:text-slate-300"
+                                            />
+                                        </td>
                                         <td className="px-3 py-3"><button onClick={e => { e.stopPropagation(); removeInvoice(inv.id) }} className="text-slate-300 hover:text-red-500"><Trash2 size={14} /></button></td>
                                     </tr>
                                 ))}
@@ -333,11 +424,20 @@ export const BatchUpload: React.FC = () => {
 
                 {/* Right: PDF */}
                 {showPdf && selectedInvoice && (
-                    <div className="w-1/2 bg-slate-100 flex flex-col h-full">
-                        <div className="p-2 bg-white border-b border-slate-200 flex justify-between px-4">
-                            <span className="text-xs font-bold text-slate-500 truncate">{selectedInvoice.file.name}</span>
+                    <div className="w-1/2 bg-slate-100 flex flex-col h-full border-l border-slate-200">
+                        <div className="p-2 bg-white border-b border-slate-200 flex justify-between px-4 items-center">
+                            <span className="text-xs font-bold text-slate-500 truncate" title={selectedInvoice.file.name}>{selectedInvoice.file.name}</span>
+                            <span className="text-[10px] uppercase font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-500">{selectedInvoice.file.type.split('/')[1]}</span>
                         </div>
-                        <iframe src={pdfUrl!} className="w-full h-full" title="PDF" />
+                        <div className="flex-1 bg-slate-200/50 flex items-center justify-center p-4 overflow-hidden">
+                            {selectedInvoice.file.type === 'application/pdf' ? (
+                                <iframe src={pdfUrl!} className="w-full h-full rounded shadow-sm bg-white" title="Document Preview" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center overflow-auto">
+                                    <img src={pdfUrl!} alt="Preview" className="max-w-full max-h-full object-contain rounded shadow-sm bg-white" />
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
