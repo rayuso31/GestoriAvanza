@@ -272,7 +272,7 @@ export const BatchUpload: React.FC = () => {
             <div className="p-4 border-b border-slate-200 bg-white rounded-t-xl flex flex-col gap-4">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                        <h2 className="font-semibold text-slate-700">Gestión de Lote</h2>
+                        <h2 className="font-semibold text-slate-700">Gestión de Lote <span className="text-xs text-slate-400 font-normal ml-2">v2.1 (Full Width)</span></h2>
                         {/* Progress Badge */}
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border flex items-center gap-1.5 ${invoices.every(i => i.status === 'success')
                             ? 'bg-green-100 text-green-700 border-green-200'
