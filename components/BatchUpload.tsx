@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useRef, useEffect } from 'react';
 import { UploadCloud, FileText, CheckCircle2, AlertCircle, Eye, EyeOff, Download, RefreshCw, Trash2, X, ChevronDown, Loader2 } from 'lucide-react';
 import { DocumentType, Deductibility } from '../types';
@@ -33,8 +35,9 @@ export const BatchUpload: React.FC = () => {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL?.replace('/test', '/extract') || 'https://primary-xdh7-production.up.railway.app/webhook/extract';
-    const EXPORT_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL?.replace('/test', '/export-excel') || 'https://primary-xdh7-production.up.railway.app/webhook/export-excel';
+    // API Routes (local, no external dependencies)
+    const WEBHOOK_URL = '/api/extract';
+    const EXPORT_WEBHOOK_URL = '/api/export';
 
     // --- Logic ---
     const handleFiles = (newFiles: FileList | null) => {
