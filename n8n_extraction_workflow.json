@@ -1,5 +1,5 @@
 {
-    "name": "Extracción Facturas (JSON)",
+    "name": "Extracción Facturas (OCR + OpenAI Agent)",
     "nodes": [
         {
             "parameters": {
@@ -14,7 +14,7 @@
             "type": "n8n-nodes-base.webhook",
             "typeVersion": 1,
             "position": [
-                380,
+                300,
                 340
             ],
             "id": "webhook-trigger"
@@ -35,7 +35,7 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 1,
             "position": [
-                600,
+                500,
                 340
             ],
             "id": "is-pdf-check"
@@ -44,47 +44,82 @@
             "parameters": {
                 "model": "mistral-large-latest",
                 "options": {
-                    "temperature": 0.1
+                    "temperature": 0
                 },
-                "prompt": "Analiza este DOCUMENTO PDF adjunto y extrae información en JSON estricto:\n- fecha\n- numero_factura\n- base_imponible\n- cuota_iva\n- total\n- proveedor\n- cif_proveedor"
+                "prompt": "Transcribe TODO el texto visible de este documento PDF exactamente como aparece. NO interpretes nada, solo extrae el texto crudo completo incluyendo números, fechas y nombres."
             },
-            "name": "Mistral PDF",
+            "name": "Mistral OCR PDF",
             "type": "n8n-nodes-base.mistralAi",
             "typeVersion": 1,
             "position": [
-                820,
+                700,
                 240
             ],
-            "id": "mistral-pdf",
-            "notes": "Configura aquí modo DOCUMENTO"
+            "id": "mistral-ocr-pdf",
+            "notes": "Solo OCR - Transcripción de texto"
         },
         {
             "parameters": {
                 "model": "mistral-large-latest",
                 "options": {
-                    "temperature": 0.1
+                    "temperature": 0
                 },
-                "prompt": "Analiza esta IMAGEN adjunta y extrae información en JSON estricto:\n- fecha\n- numero_factura\n- base_imponible\n- cuota_iva\n- total\n- proveedor\n- cif_proveedor"
+                "prompt": "Transcribe TODO el texto visible de esta imagen exactamente como aparece. NO interpretes nada, solo extrae el texto crudo completo incluyendo números, fechas y nombres. Si hay tablas, mantén la estructura."
             },
-            "name": "Mistral Vision",
+            "name": "Mistral OCR Imagen",
             "type": "n8n-nodes-base.mistralAi",
             "typeVersion": 1,
             "position": [
-                820,
+                700,
                 440
             ],
-            "id": "mistral-vision",
-            "notes": "Configura aquí modo VISIÓN"
+            "id": "mistral-ocr-imagen",
+            "notes": "Solo OCR - Transcripción de texto"
         },
         {
             "parameters": {
-                "jsCode": "// Unificamos respuesta de ambas ramas\nconst mistralContent = $input.all()[0].json.content || '{}';\nlet extractedData = {};\ntry {\n  extractedData = JSON.parse(mistralContent);\n} catch (e) {\n  extractedData = { error: 'Error parseando JSON de IA', raw: mistralContent };\n}\n\n// Recuperamos metadatos originales del body (OJO: al pasar por nodos AI a veces se pierde el body original, asegurarse de pasarlo o recuperarlo del webhook)\n// Simplificación para demo: asumimos que la data está en el item\nreturn [{\n  json: {\n    ...extractedData\n  }\n}];"
+                "model": "gpt-4o",
+                "options": {
+                    "temperature": 0.1
+                },
+                "messages": {
+                    "values": [
+                        {
+                            "role": "system",
+                            "content": "Eres un experto contable español. Tu trabajo es analizar texto extraído de facturas y tickets y estructurar los datos en JSON.\n\nDEBES devolver SOLO un objeto JSON válido con esta estructura exacta:\n{\n  \"fecha\": \"DD/MM/YYYY\",\n  \"numero_factura\": \"string\",\n  \"base_imponible\": number,\n  \"cuota_iva\": number,\n  \"total\": number,\n  \"proveedor\": \"string\",\n  \"cif_proveedor\": \"string\"\n}\n\nReglas:\n- Fechas siempre en formato DD/MM/YYYY\n- Números con punto decimal (ej: 125.50)\n- Si falta base_imponible, calcula: total - cuota_iva\n- Si falta cuota_iva, calcula: total - base_imponible\n- Si no encuentras un campo, pon null\n- NO añadas explicaciones, SOLO el JSON"
+                        },
+                        {
+                            "role": "user",
+                            "content": "={{ 'Analiza el siguiente texto extraído de una factura y devuelve el JSON estructurado:\\n\\n' + $json.content }}"
+                        }
+                    ]
+                }
+            },
+            "name": "OpenAI Agente Contable",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1.5,
+            "position": [
+                920,
+                340
+            ],
+            "id": "openai-agent",
+            "credentials": {
+                "openAiApi": {
+                    "id": "YOUR_OPENAI_CREDENTIAL_ID",
+                    "name": "OpenAI API"
+                }
+            },
+            "notes": "Interpreta el OCR y estructura los datos"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Extraer respuesta de OpenAI\nconst choices = $input.all()[0].json.choices || [];\nconst messageContent = choices[0]?.message?.content || '{}';\n\nlet extractedData = {};\n\n// Limpiar markdown si existe\nlet cleanedContent = messageContent.replace(/```json/g, '').replace(/```/g, '').trim();\nconst firstBrace = cleanedContent.indexOf('{');\nconst lastBrace = cleanedContent.lastIndexOf('}');\nif (firstBrace !== -1 && lastBrace !== -1) {\n    cleanedContent = cleanedContent.substring(firstBrace, lastBrace + 1);\n}\n\ntry {\n  extractedData = JSON.parse(cleanedContent);\n} catch (e) {\n  extractedData = { error: 'Error parseando JSON', raw: messageContent };\n}\n\nreturn [{ json: extractedData }];"
             },
             "name": "Limpiar JSON",
             "type": "n8n-nodes-base.code",
             "typeVersion": 1,
             "position": [
-                1040,
+                1140,
                 340
             ],
             "id": "clean-json-node"
@@ -100,7 +135,7 @@
             "type": "n8n-nodes-base.respondToWebhook",
             "typeVersion": 1,
             "position": [
-                1260,
+                1360,
                 340
             ],
             "id": "response-node"
@@ -122,32 +157,43 @@
             "main": [
                 [
                     {
-                        "node": "Mistral PDF",
+                        "node": "Mistral OCR PDF",
                         "type": "main",
                         "index": 0
                     }
                 ],
                 [
                     {
-                        "node": "Mistral Vision",
+                        "node": "Mistral OCR Imagen",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "Mistral PDF": {
+        "Mistral OCR PDF": {
             "main": [
                 [
                     {
-                        "node": "Limpiar JSON",
+                        "node": "OpenAI Agente Contable",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "Mistral Vision": {
+        "Mistral OCR Imagen": {
+            "main": [
+                [
+                    {
+                        "node": "OpenAI Agente Contable",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "OpenAI Agente Contable": {
             "main": [
                 [
                     {
