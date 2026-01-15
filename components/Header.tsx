@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { Bell, User } from 'lucide-react';
 
@@ -27,14 +29,14 @@ export const Header: React.FC = () => {
             <Bell size={20} />
             <span className="absolute top-2 right-2 w-2 h-2 bg-[#9e1c22] rounded-full border border-white"></span>
           </button>
-          
+
           <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium text-slate-900">Alejandra Avanza</p>
               <p className="text-xs text-slate-500">Administradora</p>
             </div>
             <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden">
-               <span className="text-[#9e1c22] font-semibold text-sm">AA</span>
+              <span className="text-[#9e1c22] font-semibold text-sm">AA</span>
             </div>
           </div>
         </div>
