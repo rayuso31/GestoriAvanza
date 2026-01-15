@@ -49,6 +49,7 @@ export async function POST(request: Request) {
             total?: number;
             proveedor?: string;
             cif_proveedor?: string;
+            codigo_proveedor?: string;
         }, index: number) => {
             // Calculate IVA percentage from base and cuota
             const base = inv.base_imponible || 0;
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
                 index + 1,                                    // A: Código (auto-increment)
                 1,                                            // B: Libro IVA (1 = libro general)
                 inv.fecha || '',                              // C: Fecha
-                settings?.codigoProveedor || '',              // D: Cuenta proveedor
+                inv.codigo_proveedor || settings?.codigoProveedor || '',  // D: Cuenta proveedor (per-invoice or global)
                 inv.numero_factura || '',                     // E: Factura
                 inv.proveedor || '',                          // F: Nombre
                 inv.cif_proveedor || '',                      // G: CIF

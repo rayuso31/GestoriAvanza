@@ -12,6 +12,7 @@ interface ExtractedData {
     total: number | null;
     proveedor: string | null;
     cif_proveedor: string | null;
+    codigo_proveedor?: string | null;
 }
 
 interface InvoiceRequest {
@@ -370,8 +371,10 @@ export const BatchUpload: React.FC = () => {
                             <thead className="bg-slate-50 text-slate-500 font-medium sticky top-0 shadow-sm z-10">
                                 <tr>
                                     <th className="px-3 py-2 w-10"></th>
+                                    <th className="px-3 py-2">Código</th>
                                     <th className="px-3 py-2">Fecha</th>
                                     <th className="px-3 py-2">Proveedor</th>
+                                    <th className="px-3 py-2">NIF</th>
                                     <th className="px-3 py-2 text-right">Total</th>
                                     <th className="px-3 py-2 w-10"></th>
                                 </tr>
@@ -390,6 +393,15 @@ export const BatchUpload: React.FC = () => {
                                         </td>
                                         <td className="px-3 py-3">
                                             <input
+                                                value={inv.data?.codigo_proveedor || ''}
+                                                onChange={e => updateField(inv.id, 'codigo_proveedor', e.target.value)}
+                                                disabled={inv.status === 'processing'}
+                                                placeholder="400XXX"
+                                                className="bg-transparent w-24 outline-none disabled:opacity-50 placeholder:text-slate-300 font-mono"
+                                            />
+                                        </td>
+                                        <td className="px-3 py-3">
+                                            <input
                                                 value={inv.data?.fecha || ''}
                                                 onChange={e => updateField(inv.id, 'fecha', e.target.value)}
                                                 disabled={inv.status === 'processing'}
@@ -404,6 +416,15 @@ export const BatchUpload: React.FC = () => {
                                                 disabled={inv.status === 'processing'}
                                                 placeholder="Nombre Proveedor"
                                                 className="bg-transparent w-full outline-none disabled:opacity-50 placeholder:text-slate-300"
+                                            />
+                                        </td>
+                                        <td className="px-3 py-3">
+                                            <input
+                                                value={inv.data?.cif_proveedor || ''}
+                                                onChange={e => updateField(inv.id, 'cif_proveedor', e.target.value)}
+                                                disabled={inv.status === 'processing'}
+                                                placeholder="B12345678"
+                                                className="bg-transparent w-28 outline-none disabled:opacity-50 placeholder:text-slate-300 font-mono"
                                             />
                                         </td>
                                         <td className="px-3 py-3 text-right">

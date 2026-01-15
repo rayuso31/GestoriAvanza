@@ -173,7 +173,12 @@ export async function POST(request: Request) {
         const structuredData = await structureData(ocrText);
         console.log('[API] Structured data:', structuredData);
 
-        // 4. Return the result
+        // 4. Clean NIF (remove hyphens: B-9082738 -> B9082738)
+        if (structuredData.cif_proveedor) {
+            structuredData.cif_proveedor = structuredData.cif_proveedor.replace(/-/g, '').trim();
+        }
+
+        // 5. Return the result
         return Response.json(structuredData);
 
     } catch (error) {
