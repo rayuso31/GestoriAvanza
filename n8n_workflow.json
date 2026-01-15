@@ -1,0 +1,132 @@
+{
+    "name": "Procesamiento de Facturas a Contasol (Final)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "test",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                460,
+                340
+            ],
+            "id": "webhook-trigger"
+        },
+        {
+            "parameters": {
+                "model": "mistral-large-latest",
+                "options": {
+                    "temperature": 0.1
+                },
+                "prompt": "Analiza esta factura adjunta y extrae la siguiente información en formato JSON estricto:\n- fecha (DD/MM/YYYY)\n- numero_factura\n- base_imponible (número)\n- porcentaje_iva (número)\n- cuota_iva (número)\n- total (número)\n- proveedor (nombre)\n\nSi no encuentras algún campo, déjalo como null o 0."
+            },
+            "name": "Mistral AI",
+            "type": "n8n-nodes-base.mistralAi",
+            "typeVersion": 1,
+            "position": [
+                680,
+                340
+            ],
+            "id": "mistral-node",
+            "notes": "Configura tus credenciales de Mistral aquí"
+        },
+        {
+            "parameters": {
+                "jsCode": "const data = JSON.parse($input.all()[0].json.content || '{}');\nconst providerCode = $input.all()[0].json.body.providerCode || '00000';\nconst docType = $input.all()[0].json.body.docType || 'F';\n\n// Mapeo TENTATIVO para Contasol (FRE.xlsx) basado en Guías\n// Col A: Tipo, B: Codigo, L: Factura, S: Base\n// Ajusta las letras de las claves (keys) si verificas otras columnas en la guía.\nreturn [{\n  json: {\n    'A': docType,\n    'B': providerCode,\n    'C': '', // Actividad\n    'E': data.fecha,\n    'L': data.numero_factura,\n    'S': data.base_imponible,\n    'T': data.cuota_iva,\n    'U': data.total,\n    'Z_Info': data.proveedor // Info extra\n  }\n}];"
+            },
+            "name": "Formatear Datos",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                900,
+                340
+            ],
+            "id": "format-node"
+        },
+        {
+            "parameters": {
+                "fileFormat": "xlsx",
+                "options": {
+                    "fileName": "FRE.xlsx"
+                }
+            },
+            "name": "Crear Excel",
+            "type": "n8n-nodes-base.spreadsheetFile",
+            "typeVersion": 1,
+            "position": [
+                1120,
+                340
+            ],
+            "id": "create-excel-node"
+        },
+        {
+            "parameters": {
+                "respondWith": "binary",
+                "responseDataSource": "set",
+                "dataPropertyName": "data"
+            },
+            "name": "Responder Archivo",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                1340,
+                340
+            ],
+            "id": "response-node"
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Mistral AI",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Mistral AI": {
+            "main": [
+                [
+                    {
+                        "node": "Formatear Datos",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Formatear Datos": {
+            "main": [
+                [
+                    {
+                        "node": "Crear Excel",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Crear Excel": {
+            "main": [
+                [
+                    {
+                        "node": "Responder Archivo",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

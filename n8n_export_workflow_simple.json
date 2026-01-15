@@ -1,0 +1,50 @@
+{
+    "name": "Generar Excel Final (Simple)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "export-excel",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "name": "Webhook Exportar",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                460,
+                340
+            ],
+            "id": "webhook-export"
+        },
+        {
+            "parameters": {
+                "jsCode": "return $input.all();"
+            },
+            "name": "Preparar Datos",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                680,
+                340
+            ],
+            "id": "prepare-data"
+        }
+    ],
+    "connections": {
+        "Webhook Exportar": {
+            "main": [
+                [
+                    {
+                        "node": "Preparar Datos",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

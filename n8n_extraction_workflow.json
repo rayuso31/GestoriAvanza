@@ -1,0 +1,106 @@
+{
+    "name": "Extracción Facturas (JSON)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "extract",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                460,
+                340
+            ],
+            "id": "webhook-trigger"
+        },
+        {
+            "parameters": {
+                "model": "mistral-large-latest",
+                "options": {
+                    "temperature": 0.1
+                },
+                "prompt": "Analiza esta factura adjunta y extrae la siguiente información en formato JSON estricto:\n- fecha (DD/MM/YYYY)\n- numero_factura (string)\n- base_imponible (número, usa punto para decimales)\n- cuota_iva (número)\n- total (número)\n- proveedor (nombre)\n- cif_proveedor (si aparece)\n\nSi no encuentras algún campo, devuelve null."
+            },
+            "name": "Mistral AI",
+            "type": "n8n-nodes-base.mistralAi",
+            "typeVersion": 1,
+            "position": [
+                680,
+                340
+            ],
+            "id": "mistral-node",
+            "notes": "Configura tus credenciales de Mistral aquí"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Parsea el contenido de Mistral y asegúrate que es un objeto limpio\nconst mistralContent = $input.all()[0].json.content || '{}';\nlet extractedData = {};\ntry {\n  extractedData = JSON.parse(mistralContent);\n} catch (e) {\n  extractedData = { error: 'Error parseando JSON de IA', raw: mistralContent };\n}\n\n// Añadimos metadatos del input original si los hay\nconst body = $input.all()[0].json.body || {};\n\nreturn [{\n  json: {\n    ...extractedData,\n    _metadata: {\n       providerCode: body.providerCode,\n       docType: body.docType,\n       filename: body.filename // Si lo enviamos desde frontend\n    }\n  }\n}];"
+            },
+            "name": "Limpiar JSON",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                900,
+                340
+            ],
+            "id": "clean-json-node"
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseDataSource": "set",
+                "dataPropertyName": "data",
+                "options": {}
+            },
+            "name": "Responder JSON",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                1120,
+                340
+            ],
+            "id": "response-node"
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Mistral AI",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Mistral AI": {
+            "main": [
+                [
+                    {
+                        "node": "Limpiar JSON",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Limpiar JSON": {
+            "main": [
+                [
+                    {
+                        "node": "Responder JSON",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

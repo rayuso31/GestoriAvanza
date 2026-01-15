@@ -1,0 +1,161 @@
+{
+    "name": "Generar Excel Final (Contasol + Histórico)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "export-excel",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "name": "Webhook Exportar",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                460,
+                340
+            ],
+            "id": "webhook-export"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Separamos los items recibidos para procesarlos individualmente si es necesario\n// o preparamos la estructura para Google Sheets y Excel\nconst invoices = $input.all()[0].json.invoices || [];\n\nreturn invoices.map(inv => ({\n  json: {\n    ...inv,\n    timestamp_export: new Date().toISOString()\n  }\n}));"
+            },
+            "name": "Preparar Datos",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                680,
+                340
+            ],
+            "id": "prepare-data"
+        },
+        {
+            "parameters": {
+                "operation": "append",
+                "sheetId": {
+                    "__rl": true,
+                    "mode": "fromUrl",
+                    "value": ""
+                },
+                "range": "A:Z",
+                "options": {}
+            },
+            "name": "Google Sheets (Histórico)",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 1,
+            "position": [
+                900,
+                240
+            ],
+            "id": "gsheet-node",
+            "notes": "Conecta aquí tu cuenta de Google y pega la URL de tu Sheet"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Mapeo FINAL para Excel Contasol\n// Aseguramos que las claves coincidan con las columnas esperadas\nreturn $input.all().map(item => {\n   const d = item.json;\n   return {\n     json: {\n        'A': d.data?.A || 'F',      // Tipo\n        'B': d.data?.B || '00000', // Codigo\n        'C': '',                   // Actividad\n        'E': d.data?.fecha,        // Fecha\n        'L': d.data?.numero_factura, // Factura\n        'S': d.data?.total,        // Base (Temporalmente total a falta de desglose exacto validado)\n        'Z': d.data?.proveedor     // Info extra\n     }\n   }\n});"
+            },
+            "name": "Formato Contasol",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                900,
+                460
+            ],
+            "id": "format-contasol"
+        },
+        {
+            "parameters": {
+                "fileFormat": "xlsx",
+                "options": {
+                    "fileName": "FRE_Lote.xlsx"
+                }
+            },
+            "name": "Crear Archivo Excel",
+            "type": "n8n-nodes-base.spreadsheetFile",
+            "typeVersion": 1,
+            "position": [
+                1120,
+                460
+            ],
+            "id": "create-excel-final"
+        },
+        {
+            "parameters": {
+                "respondWith": "binary",
+                "responseDataSource": "set",
+                "dataPropertyName": "data",
+                "options": {}
+            },
+            "name": "Descargar Excel",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                1340,
+                400
+            ],
+            "id": "response-download"
+        }
+    ],
+    "connections": {
+        "Webhook Exportar": {
+            "main": [
+                [
+                    {
+                        "node": "Preparar Datos",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Preparar Datos": {
+            "main": [
+                [
+                    {
+                        "node": "Google Sheets (Histórico)",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Formato Contasol",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Google Sheets (Histórico)": {
+            "main": [
+                [
+                    // Flujo opcional de confirmación tras guardar
+                ]
+            ]
+        },
+        "Formato Contasol": {
+            "main": [
+                [
+                    {
+                        "node": "Crear Archivo Excel",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Crear Archivo Excel": {
+            "main": [
+                [
+                    {
+                        "node": "Descargar Excel",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}
