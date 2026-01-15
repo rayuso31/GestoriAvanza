@@ -111,27 +111,29 @@ export const BatchUpload: React.FC = () => {
 
         try {
             const payload = {
-                invoices: validInvoices.map(inv => ({
-                    filename: inv.file.name,
-                    data: inv.data,
-                    metadata: { providerCode, docType, deductibility }
-                }))
+                invoices: validInvoices.map(inv => inv.data),
+                settings: {
+                    codigoProveedor: providerCode,
+                    tipoDocumento: docType,
+                    deducibilidad: deductibility
+                }
             };
             const response = await fetch(EXPORT_WEBHOOK_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
-            if (!response.ok) throw new Error('Error export');
+            if (!response.ok) throw new Error('Error en exportación');
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `REMESA_${providerCode || 'BATCH'}.xlsx`;
+            a.download = `facturas_${providerCode || 'BATCH'}_${new Date().toISOString().split('T')[0]}.csv`;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
-            if (confirm('¿Limpiar lista?')) {
+            document.body.removeChild(a);
+            if (confirm('¿Limpiar lista de facturas?')) {
                 setInvoices([]);
                 setSelectedInvoiceId(null);
             }
