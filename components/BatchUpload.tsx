@@ -384,7 +384,7 @@ export const BatchUpload: React.FC = () => {
                                         <td className="px-3 py-3">
                                             {inv.status === 'processing' ? <Loader2 className="animate-spin text-indigo-500" size={16} /> :
                                                 inv.status === 'success' ? <CheckCircle2 className="text-emerald-500" size={16} /> :
-                                                    inv.status === 'error' ? <AlertCircle className="text-red-500" size={16} title={inv.error} /> : <div className="w-4 h-4 bg-slate-200 rounded-full" />}
+                                                    inv.status === 'error' ? <span title={inv.error}><AlertCircle className="text-red-500" size={16} /></span> : <div className="w-4 h-4 bg-slate-200 rounded-full" />}
                                         </td>
                                         <td className="px-3 py-3">
                                             <input
