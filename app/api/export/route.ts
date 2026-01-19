@@ -115,7 +115,7 @@ export async function POST(request: Request) {
 
             // Add row with raw numbers/dates
             const row = worksheet.addRow({
-                A: index + 1,
+                A: null, // Let Contasol auto-assign Código/Asiento ID to avoid manual prompt
                 B: 1, // Libro IVA general
                 C: dateObj, // Date Object
                 D: paddedAccount, // String (to keep zeros if any)
