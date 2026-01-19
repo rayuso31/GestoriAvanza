@@ -1,5 +1,6 @@
 // API Route: /api/export
 // Generates IVS.xlsx format for Contasol (IVA Soportado) using ExcelJS
+// Strictly aligned with official Contasol Templates (Plantillas XLSX)
 
 import { Buffer } from 'buffer';
 import ExcelJS from 'exceljs';
@@ -15,38 +16,37 @@ export async function POST(request: Request) {
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('IVS');
 
-        // Create worksheet without headers (Contasol expects raw data starting at row 1)
-        // We define columns for key mapping but leave 'header' undefined so ExcelJS doesn't write a header row.
+        // Headers from Official Template (IVS.xlsx)
+        // Verified: Row 1 contains titles.
         worksheet.columns = [
-            { key: 'A', width: 10 }, // Código
-            { key: 'B', width: 12 }, // Libro IVA
-            { key: 'C', width: 12 }, // Fecha
-            { key: 'D', width: 12 }, // Cuenta proveedor (Must be numeric or clean string)
-            { key: 'E', width: 20 }, // Factura
-            { key: 'F', width: 30 }, // Nombre
-            { key: 'G', width: 15 }, // CIF
-            { key: 'H', width: 15 }, // Tipo operación
-            { key: 'I', width: 10 }, // Deducible
-            { key: 'J', width: 12 }, // Base 1
-            { key: 'K', width: 12 }, // Base 2
-            { key: 'L', width: 12 }, // Base 3
-            { key: 'M', width: 10 }, // % IVA 1
-            { key: 'N', width: 10 }, // % IVA 2
-            { key: 'O', width: 10 }, // % IVA 3
-            { key: 'P', width: 12 }, // Exp Recargo 1
-            { key: 'Q', width: 12 },
-            { key: 'R', width: 12 },
-            { key: 'S', width: 15 }, // Importe IVA 1
-            { key: 'T', width: 15 },
-            { key: 'U', width: 15 },
-            { key: 'V', width: 18 }, // Importe Recargo 1
-            { key: 'W', width: 18 },
-            { key: 'X', width: 18 },
-            { key: 'Y', width: 15 }, // Total
-            { key: 'Z', width: 15 } // Bienes soportados
+            { header: 'Código', key: 'A', width: 10 },
+            { header: 'Libro de IVA', key: 'B', width: 12 },
+            { header: 'Fecha', key: 'C', width: 12 },
+            { header: 'Cuenta', key: 'D', width: 15 },
+            { header: 'Factura', key: 'E', width: 20 },
+            { header: 'Nombre', key: 'F', width: 30 },
+            { header: 'C.I.F.', key: 'G', width: 15 },
+            { header: 'Tipo de operación', key: 'H', width: 15 },
+            { header: 'Deducible', key: 'I', width: 10 },
+            { header: 'Base 1', key: 'J', width: 12 },
+            { header: 'Base 2', key: 'K', width: 12 },
+            { header: 'Base 3', key: 'L', width: 12 },
+            { header: '% de IVA 1', key: 'M', width: 10 },
+            { header: '% de IVA 2', key: 'N', width: 10 },
+            { header: '% de IVA 3', key: 'O', width: 10 },
+            { header: '% de recargo 1', key: 'P', width: 12 },
+            { header: '% de recargo 2', key: 'Q', width: 12 },
+            { header: '% de recargo 3', key: 'R', width: 12 },
+            { header: 'Importe de IVA 1', key: 'S', width: 15 },
+            { header: 'Importe de IVA 2', key: 'T', width: 15 },
+            { header: 'Importe de IVA 3', key: 'U', width: 15 },
+            { header: 'Importe de recargo 1', key: 'V', width: 18 },
+            { header: 'Importe de recargo 2', key: 'W', width: 18 },
+            { header: 'Importe de recargo 3', key: 'X', width: 18 },
+            { header: 'Total', key: 'Y', width: 15 },
+            { header: 'Bienes soportados', key: 'Z', width: 15 }
         ];
 
-        // Helper to pad account numbers to 10 digits (Contasol format)
         // Helper to pad account numbers to 10 digits (Contasol format)
         const padAccount = (code: string | undefined | null) => {
             if (!code) return '4000000000'; // Default fallback
@@ -64,11 +64,9 @@ export async function POST(request: Request) {
             const cleanCode = code.replace(/[^0-9]/g, ''); // Remove non-numeric chars
 
             // CASE 2: Full Account Number (e.g. "2810000000")
-            // If user explicitly provides a long number (8+ digits), respect it completely.
             if (cleanCode.length >= 8) return cleanCode;
 
             // CASE 3: Short Suffix for Provider (e.g. "1" -> "4000000001")
-            // If just a short number, assume it's a suffix for the main provider group (400)
             const prefix = '400';
             const totalLength = 10;
             const zeros = Math.max(0, totalLength - prefix.length - cleanCode.length);
@@ -86,7 +84,7 @@ export async function POST(request: Request) {
             cif_proveedor?: string;
             codigo_proveedor?: string;
         }, index: number) => {
-            // Calculate IVA percentage from base and cuota
+            // Calculate metrics
             const base = inv.base_imponible || 0;
             const cuotaIva = inv.cuota_iva || 0;
             let pctIva = 21; // Default
@@ -102,45 +100,65 @@ export async function POST(request: Request) {
             // Pad the account code
             const paddedAccount = padAccount(inv.codigo_proveedor || settings?.codigoProveedor);
 
-            // Add row with raw numbers
+            // Parse Date correctly
+            let dateObj = new Date();
+            if (inv.fecha) {
+                // Ensure date is valid, handle potential parsing issues
+                const d = new Date(inv.fecha);
+                if (!isNaN(d.getTime())) {
+                    dateObj = d;
+                }
+            }
+
+            // Helper: Return null for 0 to leave cell empty (Contasol style for unused columns)
+            const nz = (v: number) => (v === 0 ? null : v);
+
+            // Add row with raw numbers/dates
             const row = worksheet.addRow({
                 A: index + 1,
                 B: 1, // Libro IVA general
-                C: inv.fecha || '',
-                D: paddedAccount, // Automatic padding to 10 digits
+                C: dateObj, // Date Object
+                D: paddedAccount, // String (to keep zeros if any)
                 E: inv.numero_factura || '',
                 F: inv.proveedor || '',
                 G: inv.cif_proveedor || '',
                 H: 0, // Tipo operación: Interior
                 I: deducible,
-                J: base, // Base 1
-                K: 0, // Base 2
-                L: 0, // Base 3
-                M: pctIva, // % IVA 1
-                N: 0,
-                O: 0,
-                P: 0, // % Recargo 1
-                Q: 0,
-                R: 0,
+                J: base, // Base 1 (Always write Base 1 even if 0? Actually better 0 than null for primary base)
+                K: nz(0), // Base 2 - Empty
+                L: nz(0), // Base 3 - Empty
+                M: pctIva, // % IVA 1 (Always write)
+                N: nz(0),
+                O: nz(0),
+                P: nz(0),
+                Q: nz(0),
+                R: nz(0),
                 S: cuotaIva, // Importe IVA 1
-                T: 0,
-                U: 0,
-                V: 0, // Importe Recargo 1
-                W: 0,
-                X: 0,
-                Y: inv.total || 0,
+                T: nz(0),
+                U: nz(0),
+                V: nz(0),
+                W: nz(0),
+                X: nz(0),
+                Y: inv.total || 0, // Total
                 Z: 0 // Bienes soportados: No
             });
 
-            // Apply strict number formatting to money columns (J, S, Y, etc.)
-            // '#,##0.00' ensures 2 decimals and numeric type, which Contasol prefers over text.
+            // Format Date (Col C) - Display as dd/mm/yyyy
+            row.getCell('C').numFmt = 'dd/mm/yyyy';
+
+            // Format Money Columns (J..Y) - Standard Excel Number format with 2 decimals
+            // Avoids "General" format which might confuse Contasol if locale is different.
             ['J', 'K', 'L', 'S', 'T', 'U', 'V', 'W', 'X', 'Y'].forEach(col => {
-                row.getCell(col).numFmt = '#,##0.00';
+                if (row.getCell(col).value !== null) {
+                    row.getCell(col).numFmt = '#,##0.00';
+                }
             });
 
-            // Format percentages (M, N, O, P, Q, R)
+            // Format Percentages
             ['M', 'N', 'O', 'P', 'Q', 'R'].forEach(col => {
-                row.getCell(col).numFmt = '0.00';
+                if (row.getCell(col).value !== null) {
+                    row.getCell(col).numFmt = '0.00';
+                }
             });
         });
 
