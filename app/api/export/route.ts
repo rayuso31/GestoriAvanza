@@ -15,36 +15,35 @@ export async function POST(request: Request) {
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('IVS');
 
-        // Headers - Row 1
-        // Contasol expects specific headers, but more importantly, specific column order.
-        // We will use the standard column headers for clarity.
+        // Create worksheet without headers (Contasol expects raw data starting at row 1)
+        // We define columns for key mapping but leave 'header' undefined so ExcelJS doesn't write a header row.
         worksheet.columns = [
-            { header: 'Código', key: 'A', width: 10 },
-            { header: 'Libro de IVA', key: 'B', width: 12 },
-            { header: 'Fecha', key: 'C', width: 12 }, // Fecha
-            { header: 'Cuenta', key: 'D', width: 12 }, // Cuenta proveedor
-            { header: 'Factura', key: 'E', width: 20 }, // Numero factura
-            { header: 'Nombre', key: 'F', width: 30 }, // Nombre proveedor
-            { header: 'C.I.F.', key: 'G', width: 15 }, // CIF
-            { header: 'Tipo de operación', key: 'H', width: 15 },
-            { header: 'Deducible', key: 'I', width: 10 },
-            { header: 'Base 1', key: 'J', width: 12 },
-            { header: 'Base 2', key: 'K', width: 12 },
-            { header: 'Base 3', key: 'L', width: 12 },
-            { header: '% de IVA 1', key: 'M', width: 10 },
-            { header: '% de IVA 2', key: 'N', width: 10 },
-            { header: '% de IVA 3', key: 'O', width: 10 },
-            { header: '% de recargo 1', key: 'P', width: 12 },
-            { header: '% de recargo 2', key: 'Q', width: 12 },
-            { header: '% de recargo 3', key: 'R', width: 12 },
-            { header: 'Importe de IVA 1', key: 'S', width: 15 },
-            { header: 'Importe de IVA 2', key: 'T', width: 15 },
-            { header: 'Importe de IVA 3', key: 'U', width: 15 },
-            { header: 'Importe de recargo 1', key: 'V', width: 18 },
-            { header: 'Importe de recargo 2', key: 'W', width: 18 },
-            { header: 'Importe de recargo 3', key: 'X', width: 18 },
-            { header: 'Total', key: 'Y', width: 15 },
-            { header: 'Bienes soportados', key: 'Z', width: 15 } // 0=No, 1=Sí
+            { key: 'A', width: 10 }, // Código
+            { key: 'B', width: 12 }, // Libro IVA
+            { key: 'C', width: 12 }, // Fecha
+            { key: 'D', width: 12 }, // Cuenta proveedor (Must be numeric or clean string)
+            { key: 'E', width: 20 }, // Factura
+            { key: 'F', width: 30 }, // Nombre
+            { key: 'G', width: 15 }, // CIF
+            { key: 'H', width: 15 }, // Tipo operación
+            { key: 'I', width: 10 }, // Deducible
+            { key: 'J', width: 12 }, // Base 1
+            { key: 'K', width: 12 }, // Base 2
+            { key: 'L', width: 12 }, // Base 3
+            { key: 'M', width: 10 }, // % IVA 1
+            { key: 'N', width: 10 }, // % IVA 2
+            { key: 'O', width: 10 }, // % IVA 3
+            { key: 'P', width: 12 }, // Exp Recargo 1
+            { key: 'Q', width: 12 },
+            { key: 'R', width: 12 },
+            { key: 'S', width: 15 }, // Importe IVA 1
+            { key: 'T', width: 15 },
+            { key: 'U', width: 15 },
+            { key: 'V', width: 18 }, // Importe Recargo 1
+            { key: 'W', width: 18 },
+            { key: 'X', width: 18 },
+            { key: 'Y', width: 15 }, // Total
+            { key: 'Z', width: 15 } // Bienes soportados
         ];
 
         // Add rows
