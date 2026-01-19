@@ -102,6 +102,16 @@ export async function POST(request: Request) {
             // Pad the account code
             const paddedAccount = padAccount(inv.codigo_proveedor || settings?.codigoProveedor);
 
+            // Force number formatting: 2 decimals, comma separator (Contasol Requirement)
+            // We pass them as strings to ensure Excel preserves the specific format Contasol expects.
+            const fmt = (n: number | undefined | null) => {
+                const val = n || 0;
+                return val.toFixed(2).replace('.', ',');
+            };
+
+            // Percentages can be integer if no decimals, or formatted
+            const fmtPct = (n: number) => n.toString().replace('.', ',');
+
             worksheet.addRow({
                 A: index + 1,
                 B: 1, // Libro IVA general
@@ -112,22 +122,22 @@ export async function POST(request: Request) {
                 G: inv.cif_proveedor || '',
                 H: 0, // Tipo operación: Interior
                 I: deducible,
-                J: base, // Base 1
-                K: 0, // Base 2
-                L: 0, // Base 3
-                M: pctIva, // % IVA 1
-                N: 0,
-                O: 0,
-                P: 0, // % Recargo 1
-                Q: 0,
-                R: 0,
-                S: cuotaIva, // Importe IVA 1
-                T: 0,
-                U: 0,
-                V: 0, // Importe Recargo 1
-                W: 0,
-                X: 0,
-                Y: inv.total || 0,
+                J: fmt(base), // Base 1
+                K: fmt(0), // Base 2
+                L: fmt(0), // Base 3
+                M: fmtPct(pctIva), // % IVA 1 (Percentage)
+                N: fmt(0),
+                O: fmt(0),
+                P: fmt(0), // % Recargo 1
+                Q: fmt(0),
+                R: fmt(0),
+                S: fmt(cuotaIva), // Importe IVA 1
+                T: fmt(0),
+                U: fmt(0),
+                V: fmt(0), // Importe Recargo 1
+                W: fmt(0),
+                X: fmt(0),
+                Y: fmt(inv.total || 0), // Total
                 Z: 0 // Bienes soportados: No
             });
         });
