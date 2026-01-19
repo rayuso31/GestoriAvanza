@@ -47,21 +47,32 @@ export async function POST(request: Request) {
         ];
 
         // Helper to pad account numbers to 10 digits (Contasol format)
+        // Helper to pad account numbers to 10 digits (Contasol format)
         const padAccount = (code: string | undefined | null) => {
             if (!code) return '4000000000'; // Default fallback
-            const cleanCode = code.replace(/\./g, ''); // Remove existing dots
 
-            // If it's already long enough (8+ digits), return as is
+            // CASE 1: Dot expansion (e.g. "520.1" -> "5200000001")
+            if (code.includes('.')) {
+                const [prefix, suffix] = code.split('.');
+                const safePrefix = prefix || '';
+                const safeSuffix = suffix || '';
+                const totalLength = 10;
+                const zeros = Math.max(0, totalLength - safePrefix.length - safeSuffix.length);
+                return safePrefix + '0'.repeat(zeros) + safeSuffix;
+            }
+
+            const cleanCode = code.replace(/[^0-9]/g, ''); // Remove non-numeric chars
+
+            // CASE 2: Full Account Number (e.g. "2810000000")
+            // If user explicitly provides a long number (8+ digits), respect it completely.
             if (cleanCode.length >= 8) return cleanCode;
 
-            // Algorithm: Take prefix '400' (or user's prefix if different) + zeros + suffix
-            // Example: '1' -> '400' + '000000' + '1' = '4000000001'
+            // CASE 3: Short Suffix for Provider (e.g. "1" -> "4000000001")
+            // If just a short number, assume it's a suffix for the main provider group (400)
             const prefix = '400';
             const totalLength = 10;
-
-            // Calculate zeros needed
-            const zerosObj = Math.max(0, totalLength - prefix.length - cleanCode.length);
-            return prefix + '0'.repeat(zerosObj) + cleanCode;
+            const zeros = Math.max(0, totalLength - prefix.length - cleanCode.length);
+            return prefix + '0'.repeat(zeros) + cleanCode;
         };
 
         // Add rows
