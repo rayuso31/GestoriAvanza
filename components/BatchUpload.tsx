@@ -129,7 +129,7 @@ export const BatchUpload: React.FC = () => {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `facturas_${providerCode || 'BATCH'}_${new Date().toISOString().split('T')[0]}.csv`;
+            a.download = `IVS_${providerCode || 'BATCH'}_${new Date().toISOString().split('T')[0]}.xlsx`;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);

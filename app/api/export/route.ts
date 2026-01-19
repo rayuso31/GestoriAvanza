@@ -1,5 +1,8 @@
 // API Route: /api/export
-// Generates IVS.xls format for Contasol (IVA Soportado)
+// Generates IVS.xlsx format for Contasol (IVA Soportado) using ExcelJS
+
+import { Buffer } from 'buffer';
+import ExcelJS from 'exceljs';
 
 export async function POST(request: Request) {
     try {
@@ -9,39 +12,43 @@ export async function POST(request: Request) {
             return Response.json({ error: 'No invoices provided' }, { status: 400 });
         }
 
-        // IVS.xls Headers for Contasol (IVA Soportado)
-        // Columns A-AA as per Contasol guide
-        const headers = [
-            'Codigo',           // A - N(5) - Índice único
-            'Libro_IVA',        // B - N(1)
-            'Fecha',            // C - Fecha DD/MM/AAAA
-            'Cuenta',           // D - N(10) - Cuenta proveedor
-            'Factura',          // E - A(30) - Número factura
-            'Nombre',           // F - A(100) - Nombre proveedor
-            'CIF',              // G - A(18)
-            'Tipo_Operacion',   // H - N(1) - 0=Interior, 1=Import, 2=Intracom, 3=Agric
-            'Deducible',        // I - N(1) - 0=Deducible, 1=No deducible, 2=Prorrata
-            'Base_1',           // J - ND(15)
-            'Base_2',           // K - ND(15)
-            'Base_3',           // L - ND(15)
-            'Pct_IVA_1',        // M - ND(5)
-            'Pct_IVA_2',        // N - ND(5)
-            'Pct_IVA_3',        // O - ND(5)
-            'Pct_Recargo_1',    // P - ND(5)
-            'Pct_Recargo_2',    // Q - ND(5)
-            'Pct_Recargo_3',    // R - ND(5)
-            'Importe_IVA_1',    // S - ND(15)
-            'Importe_IVA_2',    // T - ND(15)
-            'Importe_IVA_3',    // U - ND(15)
-            'Importe_Recargo_1',// V - ND(15)
-            'Importe_Recargo_2',// W - ND(15)
-            'Importe_Recargo_3',// X - ND(15)
-            'Total',            // Y - ND(15)
-            'Bienes_Soportados' // Z - N(1) - 0=No, 1=Sí
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('IVS');
+
+        // Headers - Row 1
+        // Contasol expects specific headers, but more importantly, specific column order.
+        // We will use the standard column headers for clarity.
+        worksheet.columns = [
+            { header: 'Código', key: 'A', width: 10 },
+            { header: 'Libro de IVA', key: 'B', width: 12 },
+            { header: 'Fecha', key: 'C', width: 12 }, // Fecha
+            { header: 'Cuenta', key: 'D', width: 12 }, // Cuenta proveedor
+            { header: 'Factura', key: 'E', width: 20 }, // Numero factura
+            { header: 'Nombre', key: 'F', width: 30 }, // Nombre proveedor
+            { header: 'C.I.F.', key: 'G', width: 15 }, // CIF
+            { header: 'Tipo de operación', key: 'H', width: 15 },
+            { header: 'Deducible', key: 'I', width: 10 },
+            { header: 'Base 1', key: 'J', width: 12 },
+            { header: 'Base 2', key: 'K', width: 12 },
+            { header: 'Base 3', key: 'L', width: 12 },
+            { header: '% de IVA 1', key: 'M', width: 10 },
+            { header: '% de IVA 2', key: 'N', width: 10 },
+            { header: '% de IVA 3', key: 'O', width: 10 },
+            { header: '% de recargo 1', key: 'P', width: 12 },
+            { header: '% de recargo 2', key: 'Q', width: 12 },
+            { header: '% de recargo 3', key: 'R', width: 12 },
+            { header: 'Importe de IVA 1', key: 'S', width: 15 },
+            { header: 'Importe de IVA 2', key: 'T', width: 15 },
+            { header: 'Importe de IVA 3', key: 'U', width: 15 },
+            { header: 'Importe de recargo 1', key: 'V', width: 18 },
+            { header: 'Importe de recargo 2', key: 'W', width: 18 },
+            { header: 'Importe de recargo 3', key: 'X', width: 18 },
+            { header: 'Total', key: 'Y', width: 15 },
+            { header: 'Bienes soportados', key: 'Z', width: 15 } // 0=No, 1=Sí
         ];
 
-        // Generate rows
-        const rows = invoices.map((inv: {
+        // Add rows
+        invoices.forEach((inv: {
             fecha?: string;
             numero_factura?: string;
             base_imponible?: number;
@@ -54,66 +61,54 @@ export async function POST(request: Request) {
             // Calculate IVA percentage from base and cuota
             const base = inv.base_imponible || 0;
             const cuotaIva = inv.cuota_iva || 0;
-            const pctIva = base > 0 ? Math.round((cuotaIva / base) * 100 * 100) / 100 : 21;
+            let pctIva = 21; // Default
+            if (base > 0) {
+                pctIva = Math.round((cuotaIva / base) * 100 * 100) / 100;
+            }
 
-            // Format numbers with comma as decimal separator (Spanish format)
-            const formatNum = (n: number) => n.toFixed(2).replace('.', ',');
-
-            // Determine deducibility from settings
-            let deducible = 0; // Default: Deducible
+            // Determine deducibility
+            let deducible = 0; // 0 = Deducible
             if (settings?.deducibilidad === 'No Deducible') deducible = 1;
             else if (settings?.deducibilidad === '50%') deducible = 2; // Prorrata
 
-            return [
-                index + 1,                                    // A: Código (auto-increment)
-                1,                                            // B: Libro IVA (1 = libro general)
-                inv.fecha || '',                              // C: Fecha
-                inv.codigo_proveedor || settings?.codigoProveedor || '',  // D: Cuenta proveedor (per-invoice or global)
-                inv.numero_factura || '',                     // E: Factura
-                inv.proveedor || '',                          // F: Nombre
-                inv.cif_proveedor || '',                      // G: CIF
-                0,                                            // H: Tipo operación (0=Interior)
-                deducible,                                    // I: Deducible
-                formatNum(base),                              // J: Base 1
-                formatNum(0),                                 // K: Base 2
-                formatNum(0),                                 // L: Base 3
-                formatNum(pctIva),                            // M: % IVA 1
-                formatNum(0),                                 // N: % IVA 2
-                formatNum(0),                                 // O: % IVA 3
-                formatNum(0),                                 // P: % Recargo 1
-                formatNum(0),                                 // Q: % Recargo 2
-                formatNum(0),                                 // R: % Recargo 3
-                formatNum(cuotaIva),                          // S: Importe IVA 1
-                formatNum(0),                                 // T: Importe IVA 2
-                formatNum(0),                                 // U: Importe IVA 3
-                formatNum(0),                                 // V: Importe Recargo 1
-                formatNum(0),                                 // W: Importe Recargo 2
-                formatNum(0),                                 // X: Importe Recargo 3
-                formatNum(inv.total || 0),                    // Y: Total
-                0                                             // Z: Bienes soportados (0=No)
-            ].map(field => {
-                const str = String(field);
-                // Escape quotes and wrap in quotes if contains separator
-                if (str.includes(';') || str.includes('"') || str.includes('\n')) {
-                    return `"${str.replace(/"/g, '""')}"`;
-                }
-                return str;
-            }).join(';');
+            worksheet.addRow({
+                A: index + 1,
+                B: 1, // Libro IVA general
+                C: inv.fecha || '',
+                D: inv.codigo_proveedor || settings?.codigoProveedor || '40000000', // Default generic provider if missing
+                E: inv.numero_factura || '',
+                F: inv.proveedor || '',
+                G: inv.cif_proveedor || '',
+                H: 0, // Tipo operación: Interior
+                I: deducible,
+                J: base, // Base 1
+                K: 0, // Base 2
+                L: 0, // Base 3
+                M: pctIva, // % IVA 1
+                N: 0,
+                O: 0,
+                P: 0, // % Recargo 1
+                Q: 0,
+                R: 0,
+                S: cuotaIva, // Importe IVA 1
+                T: 0,
+                U: 0,
+                V: 0, // Importe Recargo 1
+                W: 0,
+                X: 0,
+                Y: inv.total || 0,
+                Z: 0 // Bienes soportados: No
+            });
         });
 
-        // Build content
-        const content = [headers.join(';'), ...rows].join('\r\n');
+        // Generate buffer
+        const buffer = await workbook.xlsx.writeBuffer();
 
-        // Add BOM for UTF-8 encoding in Excel
-        const bom = '\uFEFF';
-        const output = bom + content;
-
-        // Return as downloadable .xls file (actually CSV but Contasol expects .xls extension)
-        return new Response(output, {
+        return new Response(buffer, {
             status: 200,
             headers: {
-                'Content-Type': 'application/vnd.ms-excel; charset=utf-8',
-                'Content-Disposition': `attachment; filename="IVS.xls"`,
+                'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition': `attachment; filename="IVS_${new Date().toISOString().split('T')[0]}.xlsx"`,
             },
         });
 
