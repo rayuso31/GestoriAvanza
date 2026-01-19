@@ -73,6 +73,13 @@ export async function POST(request: Request) {
             return prefix + '0'.repeat(zeros) + cleanCode;
         };
 
+        // Helper: Safe round to 2 decimals
+        const round2 = (n: any) => {
+            const num = Number(n);
+            if (isNaN(num)) return 0;
+            return Math.round((num + Number.EPSILON) * 100) / 100;
+        };
+
         // Add rows
         invoices.forEach((inv: {
             fecha?: string;
@@ -84,12 +91,15 @@ export async function POST(request: Request) {
             cif_proveedor?: string;
             codigo_proveedor?: string;
         }, index: number) => {
-            // Calculate metrics
-            const base = inv.base_imponible || 0;
-            const cuotaIva = inv.cuota_iva || 0;
+            // Calculate metrics (Safe Cast + Round)
+            const base = round2(inv.base_imponible);
+            const cuotaIva = round2(inv.cuota_iva);
+            const total = round2(inv.total);
+
             let pctIva = 21; // Default
             if (base > 0) {
-                pctIva = Math.round((cuotaIva / base) * 100 * 100) / 100;
+                // Derived percentage
+                pctIva = round2((cuotaIva / base) * 100);
             }
 
             // Determine deducibility
@@ -103,7 +113,6 @@ export async function POST(request: Request) {
             // Parse Date correctly
             let dateObj = new Date();
             if (inv.fecha) {
-                // Ensure date is valid, handle potential parsing issues
                 const d = new Date(inv.fecha);
                 if (!isNaN(d.getTime())) {
                     dateObj = d;
@@ -115,19 +124,19 @@ export async function POST(request: Request) {
 
             // Add row with raw numbers/dates
             const row = worksheet.addRow({
-                A: null, // Let Contasol auto-assign Código/Asiento ID to avoid manual prompt
+                A: null, // Let Contasol auto-assign Código/Asiento ID
                 B: 1, // Libro IVA general
                 C: dateObj, // Date Object
-                D: paddedAccount, // String (to keep zeros if any)
+                D: paddedAccount, // String
                 E: inv.numero_factura || '',
                 F: inv.proveedor || '',
                 G: inv.cif_proveedor || '',
                 H: 0, // Tipo operación: Interior
                 I: deducible,
-                J: base, // Base 1 (Always write Base 1 even if 0? Actually better 0 than null for primary base)
-                K: nz(0), // Base 2 - Empty
-                L: nz(0), // Base 3 - Empty
-                M: pctIva, // % IVA 1 (Always write)
+                J: base, // Base 1
+                K: nz(0),
+                L: nz(0),
+                M: pctIva, // % IVA 1
                 N: nz(0),
                 O: nz(0),
                 P: nz(0),
@@ -139,7 +148,7 @@ export async function POST(request: Request) {
                 V: nz(0),
                 W: nz(0),
                 X: nz(0),
-                Y: inv.total || 0, // Total
+                Y: total, // Total
                 Z: 0 // Bienes soportados: No
             });
 
@@ -147,10 +156,13 @@ export async function POST(request: Request) {
             row.getCell('C').numFmt = 'dd/mm/yyyy';
 
             // Format Money Columns (J..Y) - Standard Excel Number format with 2 decimals
-            // Avoids "General" format which might confuse Contasol if locale is different.
+            // Using custom Euro format as seen in template: #,##0.00 "€";[Red]-#,##0.00 "€"
+            // This matches strictly what Contasol uses.
+            const euroFmt = '#,##0.00 "€";[Red]-#,##0.00 "€"';
+
             ['J', 'K', 'L', 'S', 'T', 'U', 'V', 'W', 'X', 'Y'].forEach(col => {
                 if (row.getCell(col).value !== null) {
-                    row.getCell(col).numFmt = '#,##0.00';
+                    row.getCell(col).numFmt = euroFmt;
                 }
             });
 
