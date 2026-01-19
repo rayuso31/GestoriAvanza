@@ -46,6 +46,24 @@ export async function POST(request: Request) {
             { key: 'Z', width: 15 } // Bienes soportados
         ];
 
+        // Helper to pad account numbers to 10 digits (Contasol format)
+        const padAccount = (code: string | undefined | null) => {
+            if (!code) return '4000000000'; // Default fallback
+            const cleanCode = code.replace(/\./g, ''); // Remove existing dots
+
+            // If it's already long enough (8+ digits), return as is
+            if (cleanCode.length >= 8) return cleanCode;
+
+            // Algorithm: Take prefix '400' (or user's prefix if different) + zeros + suffix
+            // Example: '1' -> '400' + '000000' + '1' = '4000000001'
+            const prefix = '400';
+            const totalLength = 10;
+
+            // Calculate zeros needed
+            const zerosObj = Math.max(0, totalLength - prefix.length - cleanCode.length);
+            return prefix + '0'.repeat(zerosObj) + cleanCode;
+        };
+
         // Add rows
         invoices.forEach((inv: {
             fecha?: string;
@@ -70,11 +88,14 @@ export async function POST(request: Request) {
             if (settings?.deducibilidad === 'No Deducible') deducible = 1;
             else if (settings?.deducibilidad === '50%') deducible = 2; // Prorrata
 
+            // Pad the account code
+            const paddedAccount = padAccount(inv.codigo_proveedor || settings?.codigoProveedor);
+
             worksheet.addRow({
                 A: index + 1,
                 B: 1, // Libro IVA general
                 C: inv.fecha || '',
-                D: inv.codigo_proveedor || settings?.codigoProveedor || '40000000', // Default generic provider if missing
+                D: paddedAccount, // Automatic padding to 10 digits
                 E: inv.numero_factura || '',
                 F: inv.proveedor || '',
                 G: inv.cif_proveedor || '',
