@@ -126,7 +126,7 @@ export async function POST(request: Request) {
             const row = worksheet.addRow({
                 A: null, // Let Contasol auto-assign Código/Asiento ID
                 B: 1, // Libro IVA general
-                C: dateObj, // Date Object
+                C: dateObj, // Date Object (Invoice Date)
                 D: paddedAccount, // String
                 E: inv.numero_factura || '',
                 F: inv.proveedor || '',
@@ -155,9 +155,14 @@ export async function POST(request: Request) {
             // Format Date (Col C) - Display as dd/mm/yyyy
             row.getCell('C').numFmt = 'dd/mm/yyyy';
 
+            // IMPORTANT for Traceability: Set "Fecha de registro contable" (Col 85 / CG) to TODAY
+            // This ensures the user can find the entry created "Today" even if the invoice is old.
+            const today = new Date();
+            row.getCell(85).value = today;
+            row.getCell(85).numFmt = 'dd/mm/yyyy';
+
             // Format Money Columns (J..Y) - Standard Excel Number format with 2 decimals
             // Using custom Euro format as seen in template: #,##0.00 "€";[Red]-#,##0.00 "€"
-            // This matches strictly what Contasol uses.
             const euroFmt = '#,##0.00 "€";[Red]-#,##0.00 "€"';
 
             ['J', 'K', 'L', 'S', 'T', 'U', 'V', 'W', 'X', 'Y'].forEach(col => {
