@@ -33,6 +33,7 @@ export const BatchUpload: React.FC = () => {
     const [providerCode, setProviderCode] = useState('');
     const [docType, setDocType] = useState<DocumentType>(DocumentType.ORDINARY);
     const [deductibility, setDeductibility] = useState<Deductibility>(Deductibility.FULL);
+    const [isDebe, setIsDebe] = useState(false); // false = Haber (default for expenses), true = Debe
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -116,7 +117,8 @@ export const BatchUpload: React.FC = () => {
                 settings: {
                     codigoProveedor: providerCode,
                     tipoDocumento: docType,
-                    deducibilidad: deductibility
+                    deducibilidad: deductibility,
+                    isDebe: isDebe
                 }
             };
             const response = await fetch(EXPORT_WEBHOOK_URL, {
@@ -357,6 +359,25 @@ export const BatchUpload: React.FC = () => {
                                 className={`px-3 py-1 rounded border text-xs transition-colors ${deductibility === Deductibility.NONE ? 'bg-red-50 border-red-200 text-red-700' : 'bg-white border-slate-200 text-slate-600'}`}
                             >
                                 No Deducible
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Debe/Haber Toggle */}
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs text-slate-500 font-medium">Debe/Haber</label>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setIsDebe(false)}
+                                className={`px-3 py-1 rounded border text-xs transition-colors ${!isDebe ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-slate-200 text-slate-600'}`}
+                            >
+                                Haber
+                            </button>
+                            <button
+                                onClick={() => setIsDebe(true)}
+                                className={`px-3 py-1 rounded border text-xs transition-colors ${isDebe ? 'bg-amber-100 border-amber-300 text-amber-700' : 'bg-white border-slate-200 text-slate-600'}`}
+                            >
+                                Debe
                             </button>
                         </div>
                     </div>

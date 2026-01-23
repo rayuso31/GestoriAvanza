@@ -1,8 +1,7 @@
 // API Route: /api/export
-// Generates IVS.xlsx format for Contasol (IVA Soportado) using ExcelJS
-// Strictly aligned with official Contasol Templates (Plantillas XLSX)
+// Generates a CLEAN Excel for UiPath RPA automation
+// Simple, readable format with only essential columns
 
-import { Buffer } from 'buffer';
 import ExcelJS from 'exceljs';
 
 export async function POST(request: Request) {
@@ -14,44 +13,35 @@ export async function POST(request: Request) {
         }
 
         const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('IVS');
+        const worksheet = workbook.addWorksheet('Facturas');
 
-        // Headers from Official Template (IVS.xlsx)
-        // Verified: Row 1 contains titles.
+        // Clean, simple headers for UiPath
         worksheet.columns = [
-            { header: 'Código', key: 'A', width: 10 },
-            { header: 'Libro de IVA', key: 'B', width: 12 },
-            { header: 'Fecha', key: 'C', width: 12 },
-            { header: 'Cuenta', key: 'D', width: 15 },
-            { header: 'Factura', key: 'E', width: 20 },
-            { header: 'Nombre', key: 'F', width: 30 },
-            { header: 'C.I.F.', key: 'G', width: 15 },
-            { header: 'Tipo de operación', key: 'H', width: 15 },
-            { header: 'Deducible', key: 'I', width: 10 },
-            { header: 'Base 1', key: 'J', width: 12 },
-            { header: 'Base 2', key: 'K', width: 12 },
-            { header: 'Base 3', key: 'L', width: 12 },
-            { header: '% de IVA 1', key: 'M', width: 10 },
-            { header: '% de IVA 2', key: 'N', width: 10 },
-            { header: '% de IVA 3', key: 'O', width: 10 },
-            { header: '% de recargo 1', key: 'P', width: 12 },
-            { header: '% de recargo 2', key: 'Q', width: 12 },
-            { header: '% de recargo 3', key: 'R', width: 12 },
-            { header: 'Importe de IVA 1', key: 'S', width: 15 },
-            { header: 'Importe de IVA 2', key: 'T', width: 15 },
-            { header: 'Importe de IVA 3', key: 'U', width: 15 },
-            { header: 'Importe de recargo 1', key: 'V', width: 18 },
-            { header: 'Importe de recargo 2', key: 'W', width: 18 },
-            { header: 'Importe de recargo 3', key: 'X', width: 18 },
-            { header: 'Total', key: 'Y', width: 15 },
-            { header: 'Bienes soportados', key: 'Z', width: 15 }
+            { header: 'Fecha', key: 'fecha', width: 12 },
+            { header: 'Proveedor', key: 'proveedor', width: 35 },
+            { header: 'NIF', key: 'nif', width: 15 },
+            { header: 'Nº Factura', key: 'numFactura', width: 20 },
+            { header: 'Base', key: 'base', width: 12 },
+            { header: 'IVA %', key: 'ivaPct', width: 8 },
+            { header: 'Cuota IVA', key: 'cuotaIva', width: 12 },
+            { header: 'Total', key: 'total', width: 12 },
+            { header: 'Cuenta Proveedor', key: 'cuenta', width: 18 },
+            { header: 'Debe/Haber', key: 'debeHaber', width: 12 }
         ];
 
-        // Helper to pad account numbers to 10 digits (Contasol format)
-        const padAccount = (code: string | undefined | null) => {
-            if (!code) return '4000000000'; // Default fallback
+        // Style the header row
+        worksheet.getRow(1).font = { bold: true };
+        worksheet.getRow(1).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE8E8E8' }
+        };
 
-            // CASE 1: Dot expansion (e.g. "520.1" -> "5200000001")
+        // Helper to pad account numbers to 10 digits (same logic as before)
+        const padAccount = (code: string | undefined | null) => {
+            if (!code) return settings?.codigoProveedor || '';
+
+            // Dot expansion (e.g. "520.1" -> "5200000001")
             if (code.includes('.')) {
                 const [prefix, suffix] = code.split('.');
                 const safePrefix = prefix || '';
@@ -61,12 +51,12 @@ export async function POST(request: Request) {
                 return safePrefix + '0'.repeat(zeros) + safeSuffix;
             }
 
-            const cleanCode = code.replace(/[^0-9]/g, ''); // Remove non-numeric chars
+            const cleanCode = code.replace(/[^0-9]/g, '');
 
-            // CASE 2: Full Account Number (e.g. "2810000000")
+            // Full Account Number (8+ digits)
             if (cleanCode.length >= 8) return cleanCode;
 
-            // CASE 3: Short Suffix for Provider (e.g. "1" -> "4000000001")
+            // Short Suffix for Provider (e.g. "1" -> "4000000001")
             const prefix = '400';
             const totalLength = 10;
             const zeros = Math.max(0, totalLength - prefix.length - cleanCode.length);
@@ -80,7 +70,7 @@ export async function POST(request: Request) {
             return Math.round((num + Number.EPSILON) * 100) / 100;
         };
 
-        // Add rows
+        // Add data rows
         invoices.forEach((inv: {
             fecha?: string;
             numero_factura?: string;
@@ -90,93 +80,40 @@ export async function POST(request: Request) {
             proveedor?: string;
             cif_proveedor?: string;
             codigo_proveedor?: string;
-        }, index: number) => {
-            // Calculate metrics (Safe Cast + Round)
+        }) => {
             const base = round2(inv.base_imponible);
             const cuotaIva = round2(inv.cuota_iva);
             const total = round2(inv.total);
 
-            let pctIva = 21; // Default
+            // Calculate IVA percentage
+            let pctIva = 21;
             if (base > 0) {
-                // Derived percentage
                 pctIva = round2((cuotaIva / base) * 100);
             }
 
-            // Determine deducibility
-            let deducible = 0; // 0 = Deducible
-            if (settings?.deducibilidad === 'No Deducible') deducible = 1;
-            else if (settings?.deducibilidad === '50%') deducible = 2; // Prorrata
+            const paddedAccount = padAccount(inv.codigo_proveedor);
 
-            // Pad the account code
-            const paddedAccount = padAccount(inv.codigo_proveedor || settings?.codigoProveedor);
+            // Debe/Haber: SI = Debe, NO = Haber
+            const debeHaber = settings?.isDebe ? 'SI' : 'NO';
 
-            // Parse Date correctly
-            let dateObj = new Date();
-            if (inv.fecha) {
-                const d = new Date(inv.fecha);
-                if (!isNaN(d.getTime())) {
-                    dateObj = d;
-                }
-            }
-
-            // Helper: Return null for 0 to leave cell empty (Contasol style for unused columns)
-            const nz = (v: number) => (v === 0 ? null : v);
-
-            // Add row with raw numbers/dates
             const row = worksheet.addRow({
-                A: null, // Let Contasol auto-assign Código/Asiento ID
-                B: 1, // Libro IVA general
-                C: dateObj, // Date Object (Invoice Date)
-                D: paddedAccount, // String
-                E: inv.numero_factura || '',
-                F: inv.proveedor || '',
-                G: inv.cif_proveedor || '',
-                H: 0, // Tipo operación: Interior
-                I: deducible,
-                J: base, // Base 1
-                K: nz(0),
-                L: nz(0),
-                M: pctIva, // % IVA 1
-                N: nz(0),
-                O: nz(0),
-                P: nz(0),
-                Q: nz(0),
-                R: nz(0),
-                S: cuotaIva, // Importe IVA 1
-                T: nz(0),
-                U: nz(0),
-                V: nz(0),
-                W: nz(0),
-                X: nz(0),
-                Y: total, // Total
-                Z: 0 // Bienes soportados: No
+                fecha: inv.fecha || '',
+                proveedor: inv.proveedor || '',
+                nif: inv.cif_proveedor || '',
+                numFactura: inv.numero_factura || '',
+                base: base,
+                ivaPct: pctIva,
+                cuotaIva: cuotaIva,
+                total: total,
+                cuenta: paddedAccount,
+                debeHaber: debeHaber
             });
 
-            // Format Date (Col C) - Display as dd/mm/yyyy
-            row.getCell('C').numFmt = 'dd/mm/yyyy';
-
-            // IMPORTANT for Traceability: Set "Fecha de registro contable" (Col 85 / CG) to TODAY
-            // This ensures the user can find the entry created "Today" even if the invoice is old.
-            const today = new Date();
-            row.getCell(85).value = today;
-            row.getCell(85).numFmt = 'dd/mm/yyyy';
-
-            // Format Money Columns (J..Y) - Standard Excel Number format with 2 decimals
-            // Using custom Euro format as seen in template: #,##0.00 "€";[Red]-#,##0.00 "€"
-            const euroFmt = '#,##0.00 "€";[Red]-#,##0.00 "€"';
-
-            ['J', 'K', 'L', 'S', 'T', 'U', 'V', 'W', 'X', 'Y'].forEach(col => {
-                if (row.getCell(col).value !== null) {
-                    row.getCell(col).numFmt = euroFmt;
-                }
-            });
-
-            // Format Percentages
-            ['M', 'N', 'O', 'P', 'Q', 'R'].forEach(col => {
-                if (row.getCell(col).value !== null) {
-                    row.getCell(col).numFmt = '0.00';
-                }
-            });
+            // Format number columns
+            row.getCell('base').numFmt = '#,##0.00';
+            row.getCell('ivaPct').numFmt = '0';
+            row.getCell('cuotaIva').numFmt = '#,##0.00';
+            row.getCell('total').numFmt = '#,##0.00';
         });
 
         // Generate buffer
@@ -186,7 +123,7 @@ export async function POST(request: Request) {
             status: 200,
             headers: {
                 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition': `attachment; filename="IVS_${new Date().toISOString().split('T')[0]}.xlsx"`,
+                'Content-Disposition': `attachment; filename="Facturas_UiPath_${new Date().toISOString().split('T')[0]}.xlsx"`,
             },
         });
 
